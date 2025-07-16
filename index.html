@@ -19,7 +19,7 @@
         .spinner { border: 4px solid rgba(0, 0, 0, 0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #0ea5e9; animation: spin 1s ease-in-out infinite; }
         .btn-spinner { width: 20px; height: 20px; border-width: 3px; border-left-color: white; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #passageText, #transcriptContainer, #notebookList, #historyList, #reviewList, #libraryList, #writingFeedbackContainer, #reinforceContent, #learningPathContainer { max-height: 60vh; overflow-y: auto; }
+        #passageText, #transcriptContainer, #notebookList, #historyList, #reviewList, #libraryList, #writingFeedbackContainer, #reinforceContent, #learningPathContainer, #reinforcementReviewList { max-height: 60vh; overflow-y: auto; }
         .topic-container, .vocab-mode-container { transition: all 0.3s ease-in-out; overflow: hidden; }
         #translationModal.hidden, #confirmModal.hidden, #vocabModal.hidden, #reinforceModal.hidden { display: none; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 50; }
@@ -167,7 +167,7 @@
             </div>
         </div>
         
-        <!-- **NEW** Màn hình Lộ trình học tập -->
+        <!-- Màn hình Lộ trình học tập -->
         <div id="learning-path-view" class="view">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-3xl font-bold text-teal-600">Lộ trình của bạn</h2>
@@ -178,7 +178,7 @@
             </div>
         </div>
         
-        <!-- **NEW** Màn hình Chọn mục tiêu -->
+        <!-- Màn hình Chọn mục tiêu -->
         <div id="goal-setting-view" class="view">
             <h2 class="text-3xl font-bold text-slate-800 mb-2 text-center">Mục tiêu của bạn là gì?</h2>
             <p class="text-slate-500 text-lg mb-8 text-center">Chọn một mục tiêu để AI cá nhân hóa lộ trình tốt hơn.</p>
@@ -289,6 +289,17 @@
                 <button id="backToPreviousViewButton" class="bg-slate-500 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">Quay lại</button>
             </div>
             <div id="reviewList" class="space-y-4"></div>
+        </div>
+        
+        <!-- **NEW** Màn hình Ôn tập & Củng cố -->
+        <div id="reinforcement-view" class="view">
+             <div class="flex justify-between items-center mb-6">
+                <h2 class="text-3xl font-bold text-orange-600">Ôn tập & Củng cố</h2>
+                <button id="backToPathFromReinforcement" class="bg-slate-500 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">Về Lộ trình</button>
+            </div>
+            <p class="text-slate-600 mb-4">Đây là những câu bạn đã làm sai. Hãy xem lại và nhấn vào nút "Bài học từ AI" để hiểu rõ hơn trước khi thử lại nhé.</p>
+            <div id="reinforcementReviewList" class="space-y-4"></div>
+             <button id="retryPathStepFromReinforcement" class="mt-6 w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition">Thử lại bước này</button>
         </div>
         
         <!-- Màn hình Kết quả Kiểm tra Trình độ -->
@@ -409,6 +420,9 @@
         const goalOptionsContainer = document.getElementById('goalOptionsContainer');
         const learningPathContainer = document.getElementById('learningPathContainer');
         const backToSetupFromPath = document.getElementById('backToSetupFromPath');
+        const reinforcementReviewList = document.getElementById('reinforcementReviewList');
+        const backToPathFromReinforcement = document.getElementById('backToPathFromReinforcement');
+        const retryPathStepFromReinforcement = document.getElementById('retryPathStepFromReinforcement');
 
 
         // App State
@@ -1576,9 +1590,7 @@
             const passingThreshold = 70; // 70% to pass
 
             showView('result-view');
-            reviewAnswersButton.classList.remove('hidden');
-            viewHistoryFromResultButton.classList.add('hidden');
-
+            
             if (percentage >= passingThreshold) {
                 // Passed the step
                 const newStep = currentUserPath.currentStep + 1;
@@ -1593,6 +1605,9 @@
                     
                     playAgainButton.textContent = "Tiếp tục Lộ trình";
                     playAgainButton.onclick = showLearningPath;
+                    reviewAnswersButton.classList.remove('hidden');
+                    viewHistoryFromResultButton.classList.add('hidden');
+
                 } catch (error) {
                     showError("Không thể cập nhật tiến độ lộ trình. Lỗi: " + error.message);
                 }
@@ -1602,9 +1617,39 @@
                 finalScore.textContent = `${achievedScore} / ${totalScore}`;
                 resultMessage.textContent = `Bạn cần đạt ít nhất ${passingThreshold}% để qua bước này. Hãy cố gắng ôn tập và làm lại nhé!`;
                 
-                playAgainButton.textContent = "Làm lại bước này";
+                playAgainButton.textContent = "Thử lại ngay";
                 playAgainButton.onclick = startPathStep;
+
+                reviewAnswersButton.textContent = "Xem lại & Ôn tập";
+                reviewAnswersButton.onclick = showReinforcementView;
+                reviewAnswersButton.classList.remove('hidden');
+                viewHistoryFromResultButton.classList.add('hidden');
             }
+        }
+
+        function showReinforcementView() {
+            reinforcementReviewList.innerHTML = '';
+            const incorrectAnswers = sessionResults.filter(r => !r.isCorrect);
+
+            if (incorrectAnswers.length === 0) {
+                reinforcementReviewList.innerHTML = '<p class="text-center text-slate-500">Tuyệt vời, bạn không làm sai câu nào!</p>';
+            } else {
+                incorrectAnswers.forEach((result, index) => {
+                    const item = document.createElement('div');
+                    const q = result.question;
+                    item.className = 'p-4 rounded-lg bg-red-50 border border-red-200';
+                    item.innerHTML = `
+                        <p class="font-semibold text-slate-800">${index + 1}. ${q.question || q.clue}</p>
+                        <p class="text-sm text-slate-700 mt-2">Câu trả lời của bạn: <b class="text-red-700 font-semibold">${result.userAnswer || '(Chưa trả lời)'}</b></p>
+                        <p class="text-sm text-slate-700 mt-1">Đáp án đúng: <b class="text-green-700 font-semibold">${q.answer}</b></p>
+                        <button class="reinforce-btn mt-3 bg-fuchsia-500 hover:bg-fuchsia-600 text-white text-xs font-bold py-1 px-3 rounded-full" data-question-index="${sessionResults.indexOf(result)}">
+                            Bài học từ AI
+                        </button>
+                    `;
+                    reinforcementReviewList.appendChild(item);
+                });
+            }
+            showView('reinforcement-view');
         }
 
         // --- Review & History Functions ---
@@ -2128,11 +2173,17 @@
         createPathButton.addEventListener('click', showGoalSetting);
         continuePathButton.addEventListener('click', showLearningPath);
         backToSetupFromPath.addEventListener('click', () => showView('setup-view'));
+        backToPathFromReinforcement.addEventListener('click', showLearningPath);
+        retryPathStepFromReinforcement.addEventListener('click', startPathStep);
         
-        // **FIXED** Event Delegation for starting a path step
         appContainer.addEventListener('click', (e) => {
             if (e.target && e.target.classList.contains('start-step-btn')) {
                 startPathStep();
+            }
+            if (e.target && e.target.classList.contains('reinforce-btn')) {
+                const resultIndex = parseInt(e.target.dataset.questionIndex, 10);
+                const result = sessionResults[resultIndex];
+                requestReinforcement(result.question, result.userAnswer);
             }
         });
 
