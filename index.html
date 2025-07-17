@@ -22,7 +22,7 @@
         .btn-spinner { width: 20px; height: 20px; border-width: 3px; border-left-color: white; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         #passageText, #transcriptContainer, #notebookList, #historyList, #reviewList, #libraryList, #writingFeedbackContainer, #reinforceContent, #learningPathContainer, #reinforcementReviewList, #conversationLog { max-height: 60vh; overflow-y: auto; }
-        .topic-container, .vocab-mode-container { transition: all 0.3s ease-in-out; overflow: hidden; }
+        .topic-container, .vocab-mode-container, #customTopicContainer { transition: all 0.3s ease-in-out; overflow: hidden; }
         #translationModal.hidden, #confirmModal.hidden, #vocabModal.hidden, #reinforceModal.hidden { display: none; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 50; }
         .modal-content { background-color: white; padding: 2rem; border-radius: 1rem; max-width: 90%; width: 600px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; }
@@ -149,6 +149,7 @@
                             <option value="flashcard">Flashcards</option>
                         </select>
                     </div>
+                    <!-- UPDATED: Topic Selection with Custom Input -->
                     <div id="topicContainer" class="topic-container mt-4">
                         <label for="topicSelect" class="block text-md font-semibold mb-2 text-slate-700">Chọn chủ đề:</label>
                         <select id="topicSelect" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition bg-white">
@@ -159,7 +160,12 @@
                             <option value="Work & Business">Công việc</option>
                             <option value="Movies & Entertainment">Giải trí</option>
                             <option value="Sports">Thể thao</option>
+                            <option value="custom">Khác (Tự nhập)...</option>
                         </select>
+                    </div>
+                    <div id="customTopicContainer" class="hidden mt-4">
+                        <label for="customTopicInput" class="block text-md font-semibold mb-2 text-slate-700">Nhập chủ đề của bạn:</label>
+                        <input type="text" id="customTopicInput" placeholder="VD: Vũ trụ, Lịch sử, Âm nhạc..." class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition">
                     </div>
                     <div class="mt-4"><label for="levelSelect" class="block text-md font-semibold mb-2 text-slate-700">Chọn trình độ:</label><select id="levelSelect" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition bg-white"><option value="A2">A2</option><option value="B1" selected>B1</option><option value="B2">B2</option><option value="C1">C1</option></select></div>
                     <div id="questionCountContainer" class="mt-4">
@@ -495,6 +501,9 @@
         const endDiagnosticConversationButton = document.getElementById('endDiagnosticConversationButton');
         const diagnosticChartContainer = document.getElementById('diagnosticChartContainer');
         const diagnosticChartCanvas = document.getElementById('diagnosticChart');
+        // UPDATED: Custom Topic Elements
+        const customTopicContainer = document.getElementById('customTopicContainer');
+        const customTopicInput = document.getElementById('customTopicInput');
 
 
         // App State
@@ -797,7 +806,6 @@
         function getFillInTheBlankPrompt(level, topic, count) { return `You are an expert English teacher. Generate ${count} 'fill-in-the-blank' vocabulary questions for an English learner at the ${level} CEFR level. The topic is "${topic}". For each item, provide a sentence with "___" and the correct "answer" word. Provide a brief, helpful explanation IN VIETNAMESE. You MUST wrap your entire response in a 'json' markdown code block. The structure MUST be a valid JSON array of objects: \`\`\`json\n[ { "type": "fill_in_the_blank", "question": "The government plans to ___ a new high-speed railway.", "answer": "construct", "explanation": "Construct có nghĩa là 'xây dựng'." } ]\n\`\`\``; }
         function getWordFormationPrompt(level, topic, count) { return `You are an expert English teacher. Generate ${count} 'word-formation' questions for an English learner at the ${level} CEFR level. The topic is "${topic}". For each item, provide a sentence with a blank and a base word in parentheses. The "answer" MUST be the single, correctly formed word. Provide a brief, helpful explanation IN VIETNAMESE. You MUST wrap your entire response in a 'json' markdown code block. The structure MUST be a valid JSON array of objects: \`\`\`json\n[ { "type": "word_formation", "question": "Her ___ to the team was a huge benefit. (contribute)", "answer": "contribution", "explanation": "Cần một danh từ ở đây." } ]\n\`\`\``; }
         
-        // **FIXED** Reading prompt now enforces English for content and Vietnamese for explanation.
         function getReadingPrompt(level, topic, count) { 
             return `You are an expert English teacher. Create a reading comprehension quiz for a ${level} CEFR level learner on the topic of "${topic}".
             You MUST adhere to the following language rules STRICTLY:
@@ -823,7 +831,6 @@
             \`\`\``; 
         }
         
-        // **FIXED** Grammar prompt now accepts a topic
         function getGrammarPrompt(level, topic, count) { 
             return `You are an expert English grammar teacher. Generate ${count} multiple-choice grammar questions for a ${level} CEFR level learner. 
             Each question MUST specifically test the grammar point: "${topic}". If the topic is "General", you can test any common grammar point.
@@ -903,13 +910,26 @@
         async function startWritingPractice(settings = null) {
             currentQuizType = settings ? 'path' : 'standard';
             const level = settings ? settings.level : levelSelect.value;
-            const topic = settings ? settings.topic : topicSelect.value;
+            let topic;
+            if (settings) {
+                topic = settings.topic;
+            } else {
+                if (topicSelect.value === 'custom') {
+                    topic = customTopicInput.value.trim();
+                    if (!topic) {
+                        alert("Vui lòng nhập chủ đề tùy chỉnh của bạn.");
+                        return;
+                    }
+                } else {
+                    topic = topicSelect.value;
+                }
+            }
             
             quizData = { topic, level, quizType: 'writing' };
 
             showView('loading-view');
             loadingTitle.textContent = 'Đang tạo chủ đề...';
-            loadingMessage.textContent = `AI đang nghĩ ra một chủ đề Luyện Viết thú vị cho bạn.`;
+            loadingMessage.textContent = `AI đang nghĩ ra một chủ đề Luyện Viết thú vị về "${topic}" cho bạn.`;
             try {
                 const prompt = getWritingTopicPrompt(level, topic);
                 const result = await model.generateContent(prompt);
@@ -1039,13 +1059,32 @@
         }
 
         async function startQuiz(settings = null) {
-            if(!settings) currentQuizType = 'standard';
-            sessionResults = []; 
+            if (!settings) currentQuizType = 'standard';
+            sessionResults = [];
             const quizType = settings ? settings.type : quizTypeSelect.value;
             const vocabMode = vocabModeSelect.value;
-            const topic = settings ? settings.topic : (quizType !== 'grammar' && quizType !== 'listening' ? topicSelect.value : 'General');
             const level = settings ? settings.level : levelSelect.value;
             const count = settings ? (settings.count || 5) : questionCountSelect.value;
+
+            let topic;
+            if (settings) {
+                topic = settings.topic;
+            } else {
+                const isTopicBased = quizType === 'vocabulary' || quizType === 'reading' || quizType === 'listening';
+                if (isTopicBased) {
+                    if (topicSelect.value === 'custom') {
+                        topic = customTopicInput.value.trim();
+                        if (!topic) {
+                            alert("Vui lòng nhập chủ đề tùy chỉnh của bạn.");
+                            return;
+                        }
+                    } else {
+                        topic = topicSelect.value;
+                    }
+                } else {
+                    topic = 'General';
+                }
+            }
             
             quizData = { topic, level, quizType, vocabMode, count };
             loadingTitle.textContent = 'Đang tạo bài kiểm tra...';
@@ -1065,7 +1104,6 @@
                     }
                 }
                 else if (quizType === 'reading') prompt = getReadingPrompt(level, topic, 3);
-                // **FIXED** Pass topic to grammar prompt
                 else if (quizType === 'grammar') prompt = getGrammarPrompt(level, topic, count);
                 else if (quizType === 'listening') prompt = getListeningPrompt(level, topic, 3);
                 
@@ -1604,7 +1642,6 @@
             }
         }
         
-        // --- NEW: Chart Rendering Function ---
         function renderDiagnosticChart(skillsProfile) {
             if (chartInstance) {
                 chartInstance.destroy();
@@ -2442,12 +2479,17 @@
             questionCountContainer.style.display = isWriting ? 'none' : 'block';
 
             if (!isTopicBased) {
-                topicContainer.style.maxHeight = '0'; topicContainer.style.opacity = '0';
-                topicContainer.style.overflow = 'hidden'; topicContainer.style.marginTop = '0';
+                topicContainer.style.maxHeight = '0'; 
+                topicContainer.style.opacity = '0';
+                topicContainer.style.marginTop = '0';
+                customTopicContainer.classList.add('hidden');
             } else {
-                topicContainer.style.maxHeight = '100px'; topicContainer.style.opacity = '1';
-                topicContainer.style.overflow = 'visible';
+                topicContainer.style.maxHeight = '150px'; 
+                topicContainer.style.opacity = '1';
                 topicContainer.style.marginTop = '1.5rem';
+                if (topicSelect.value === 'custom') {
+                    customTopicContainer.classList.remove('hidden');
+                }
             }
         }
 
@@ -2467,6 +2509,16 @@
         viewHistoryFromResultButton.addEventListener('click', showHistory);
         nextQuestionButton.addEventListener('click', moveToNextQuestion);
         quizTypeSelect.addEventListener('change', handleQuizTypeChange);
+        
+        // UPDATED: Event listener for topic select
+        topicSelect.addEventListener('change', () => {
+            if (topicSelect.value === 'custom') {
+                customTopicContainer.classList.remove('hidden');
+            } else {
+                customTopicContainer.classList.add('hidden');
+            }
+        });
+
         translateQuestionBtn.addEventListener('click', () => showTranslationModal(getTranslation(questionText.textContent)));
         closeTranslationModal.addEventListener('click', () => translationModal.classList.add('hidden'));
         translationModal.addEventListener('click', (e) => { if (e.target === translationModal) { translationModal.classList.add('hidden'); } });
