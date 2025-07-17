@@ -61,6 +61,8 @@
         .lookup-word:hover { background-color: #e0f2fe; }
         .saved-word-highlight { border-bottom: 2px dotted #22c55e; cursor: help; }
         .saved-word-highlight:hover { background-color: #dcfce7; }
+        .speak-btn { background: none; border: none; cursor: pointer; }
+
 
         /* Flashcard Styles */
         .flashcard-container { perspective: 1000px; }
@@ -69,8 +71,7 @@
         .flashcard-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; border-radius: 1rem; border: 2px solid; }
         .flashcard-front { background-color: #e0f2fe; border-color: #7dd3fc; color: #075985; }
         .flashcard-back { background-color: #f0fdf4; border-color: #86efac; color: #15803d; transform: rotateY(180deg); }
-        .speak-btn { background: none; border: none; cursor: pointer; margin-left: 12px; }
-
+        
         /* Writing View Styles */
         #writingFeedbackContainer del { background-color: #fee2e2; text-decoration: line-through; color: #991b1b; padding: 2px; border-radius: 3px; }
         #writingFeedbackContainer ins { background-color: #dcfce7; text-decoration: none; color: #166534; padding: 2px; border-radius: 3px; }
@@ -450,11 +451,16 @@
         </div>
     </div>
 
-    <!-- NEW: Word Info Modal -->
+    <!-- NEW/UPDATED: Word Info Modal -->
     <div id="wordInfoModal" class="modal-overlay">
         <div class="modal-content">
             <div class="flex justify-between items-center pb-4 border-b mb-4">
-                <h3 id="wordInfoTitle" class="text-2xl font-bold text-sky-600"></h3>
+                <div id="wordInfoTitleContainer" class="flex items-center gap-3">
+                    <h3 id="wordInfoTitle" class="text-2xl font-bold text-sky-600 capitalize"></h3>
+                    <button id="wordInfoSpeakBtn" class="speak-btn">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-sky-500 hover:text-sky-700"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                    </button>
+                </div>
                 <button id="closeWordInfoModal" class="text-2xl font-bold text-slate-400 hover:text-red-500">&times;</button>
             </div>
             <div id="wordInfoContent" class="space-y-4 min-h-[100px]">
@@ -534,9 +540,10 @@
         const diagnosticChartCanvas = document.getElementById('diagnosticChart');
         const customTopicContainer = document.getElementById('customTopicContainer');
         const customTopicInput = document.getElementById('customTopicInput');
-        // NEW: Word Info Modal Elements
+        // NEW/UPDATED: Word Info Modal Elements
         const wordInfoModal = document.getElementById('wordInfoModal');
         const wordInfoTitle = document.getElementById('wordInfoTitle');
+        const wordInfoSpeakBtn = document.getElementById('wordInfoSpeakBtn');
         const wordInfoContent = document.getElementById('wordInfoContent');
         const saveWordFromInfoBtn = document.getElementById('saveWordFromInfoBtn');
         const closeWordInfoModal = document.getElementById('closeWordInfoModal');
@@ -767,13 +774,15 @@
         }
         
         // --- PROMPTS ---
+        // UPDATED PROMPT
         function getWordInfoPrompt(word) {
-            return `Provide a simple Vietnamese definition and a simple English example sentence for the word "${word}". You MUST wrap your entire response in a 'json' markdown code block.
+            return `Provide a simple Vietnamese definition, a simple English example sentence, and the IPA transcription for the word "${word}". You MUST wrap your entire response in a 'json' markdown code block.
             Example:
             \`\`\`json
             {
               "definition": "một thiết bị điện tử để lưu trữ và xử lý dữ liệu",
-              "example": "I use my computer for work and study."
+              "example": "I use my computer for work and study.",
+              "ipa": "/kəmˈpjuːtər/"
             }
             \`\`\``;
         }
@@ -918,14 +927,17 @@
             });
         }
 
+        // UPDATED FUNCTION
         async function showWordInfo(word) {
             const cleanedWord = word.trim().toLowerCase().replace(/[^a-z'-]/g, '');
             if (!cleanedWord) return;
 
             showModal(wordInfoModal);
-            wordInfoTitle.textContent = word.trim();
+            wordInfoTitle.textContent = cleanedWord;
             wordInfoContent.innerHTML = '<div class="spinner mx-auto"></div>';
             saveWordFromInfoBtn.disabled = true;
+            wordInfoSpeakBtn.onclick = () => playSpeech(cleanedWord);
+
 
             const isSaved = notebookWords.has(cleanedWord);
             if (isSaved) {
@@ -939,11 +951,17 @@
                 const prompt = getWordInfoPrompt(cleanedWord);
                 const result = await fastModel.generateContent(prompt);
                 const response = await result.response;
-                const wordInfo = extractAndParseJson(response.text());
+                const rawText = response.text();
+                const wordInfo = extractAndParseJson(rawText);
 
-                if (!wordInfo) throw new Error("Không thể lấy thông tin từ.");
+                // FIX: Add robust validation for the AI's response
+                if (!wordInfo || typeof wordInfo.definition !== 'string' || typeof wordInfo.example !== 'string' || typeof wordInfo.ipa !== 'string') {
+                    console.error("Invalid format from AI for word:", cleanedWord, "Raw Response:", rawText);
+                    throw new Error("AI did not return the expected format.");
+                }
 
                 wordInfoContent.innerHTML = `
+                    <p class="text-lg text-slate-500">${wordInfo.ipa}</p>
                     <p><b class="font-semibold text-slate-700">Nghĩa:</b> ${wordInfo.definition}</p>
                     <p class="mt-2"><b class="font-semibold text-slate-700">Ví dụ:</b> <i class="text-slate-600">"${wordInfo.example}"</i></p>
                 `;
@@ -951,7 +969,7 @@
                 // Re-enable save button if not already saved
                 if (!isSaved) {
                     saveWordFromInfoBtn.onclick = () => {
-                        saveWordToNotebook(cleanedWord, wordInfo.definition, wordInfo.example);
+                        saveWordToNotebook(cleanedWord, wordInfo.definition, wordInfo.example, wordInfo.ipa);
                         saveWordFromInfoBtn.textContent = 'Đã lưu thành công!';
                         saveWordFromInfoBtn.disabled = true;
                         notebookWords.add(cleanedWord);
@@ -965,7 +983,8 @@
                 }
 
             } catch (error) {
-                wordInfoContent.innerHTML = `<p class="text-red-500">Rất tiếc, không thể tra cứu từ này.</p>`;
+                console.error("Word Lookup Error:", error);
+                wordInfoContent.innerHTML = `<p class="text-red-500">Rất tiếc, không thể tra cứu từ này vào lúc này. Vui lòng thử lại sau.</p>`;
             }
         }
 
@@ -1282,7 +1301,7 @@
                         <div>
                             <div class="flex items-center justify-center">
                                 <h3 class="text-4xl font-bold">${currentQuestion.word}</h3>
-                                <button class="speak-btn" onclick="event.stopPropagation(); window.playSpeech('${currentQuestion.word}')">
+                                <button class="speak-btn ml-3" onclick="event.stopPropagation(); window.playSpeech('${currentQuestion.word}')">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-sky-600 hover:text-sky-800"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
                                 </button>
                             </div>
@@ -2217,7 +2236,8 @@
         }
         
         // --- Notebook Functions ---
-        async function saveWordToNotebook(word, definition, example) {
+        // UPDATED FUNCTION
+        async function saveWordToNotebook(word, definition, example, ipa) {
             if (!auth.currentUser) return;
             const cleanedWord = word.toLowerCase();
             if (notebookWords.has(cleanedWord)) return; // Don't save duplicates
@@ -2227,13 +2247,15 @@
                 await addDoc(notebookRef, {
                     word: cleanedWord, 
                     definition: definition || 'Chưa có giải thích.',
-                    example: example || 'Chưa có câu ví dụ.', 
+                    example: example || 'Chưa có câu ví dụ.',
+                    ipa: ipa || '',
                     addedAt: serverTimestamp()
                 });
                 notebookWords.add(cleanedWord); // Update local cache
             } catch (error) { console.error("Error saving word:", error); }
         }
 
+        // UPDATED FUNCTION
         async function showNotebook() {
             if (!auth.currentUser) { showError("Bạn cần đăng nhập để xem sổ tay."); return; }
             showView('notebook-view');
@@ -2254,7 +2276,21 @@
                         const wordId = docSnapshot.id;
                         const card = document.createElement('div');
                         card.className = 'bg-teal-50 p-4 rounded-lg border border-teal-200';
-                        card.innerHTML = `<div class="flex justify-between items-start"><div><h4 class="text-xl font-bold text-teal-800 capitalize">${wordData.word}</h4><p class="text-slate-600">${wordData.definition}</p><p class="text-sm text-slate-500 italic mt-2">"${wordData.example}"</p></div><button class="delete-word-btn text-red-400 hover:text-red-600 text-2xl" data-id="${wordId}" data-word="${wordData.word}" title="Xóa từ này">🗑️</button></div>`;
+                        card.innerHTML = `
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <div class="flex items-center gap-3">
+                                        <h4 class="text-xl font-bold text-teal-800 capitalize">${wordData.word}</h4>
+                                        <button class="speak-btn" onclick="window.playSpeech('${wordData.word}')">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-teal-600 hover:text-teal-800"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon></svg>
+                                        </button>
+                                    </div>
+                                    <p class="text-slate-500">${wordData.ipa || ''}</p>
+                                    <p class="text-slate-700 mt-1">${wordData.definition}</p>
+                                    <p class="text-sm text-slate-500 italic mt-2">"${wordData.example}"</p>
+                                </div>
+                                <button class="delete-word-btn text-red-400 hover:text-red-600 text-2xl" data-id="${wordId}" data-word="${wordData.word}" title="Xóa từ này">🗑️</button>
+                            </div>`;
                         notebookList.appendChild(card);
                     });
                 document.querySelectorAll('.delete-word-btn').forEach(button => {
@@ -2281,32 +2317,47 @@
             isPausedByUser = false;
             const utterance = new SpeechSynthesisUtterance(text.substring(startIndex));
             const voices = synth.getVoices();
-            utterance.voice = voices.find(voice => voice.lang.startsWith('en-')) || voices[0];
+            // Prioritize a native English speaker voice if available
+            let selectedVoice = voices.find(voice => voice.name === 'Google US English' || voice.name === 'Microsoft David - English (United States)');
+            if (!selectedVoice) {
+                selectedVoice = voices.find(voice => voice.lang.startsWith('en-')) || voices[0];
+            }
+            utterance.voice = selectedVoice;
             utterance.rate = 0.9;
-            const words = text.split(/(\s+)/);
-            const wordElements = words.map(word => { const span = document.createElement('span'); span.textContent = word; return span; });
-            transcriptContainer.innerHTML = '';
-            wordElements.forEach(el => transcriptContainer.appendChild(el));
-            let charCounter = 0;
-            const wordBoundaries = words.map(word => { const start = charCounter; charCounter += word.length; return { word, start, end: charCounter }; });
-            utterance.onboundary = (event) => {
-                lastSpokenCharIndex = startIndex + event.charIndex;
-                wordElements.forEach(el => el.classList.remove('highlight-word'));
-                for(let i = 0; i < wordBoundaries.length; i++) {
-                    if (lastSpokenCharIndex >= wordBoundaries[i].start && lastSpokenCharIndex < wordBoundaries[i].end) {
-                        wordElements[i].classList.add('highlight-word');
-                        break;
+            utterance.pitch = 1;
+
+            // This part is for highlighting text in the transcript, not needed for single word pronunciation
+            if (transcriptContainer.offsetParent !== null) { 
+                const words = text.split(/(\s+)/);
+                const wordElements = words.map(word => { const span = document.createElement('span'); span.textContent = word; return span; });
+                transcriptContainer.innerHTML = '';
+                wordElements.forEach(el => transcriptContainer.appendChild(el));
+                let charCounter = 0;
+                const wordBoundaries = words.map(word => { const start = charCounter; charCounter += word.length; return { word, start, end: charCounter }; });
+                utterance.onboundary = (event) => {
+                    lastSpokenCharIndex = startIndex + event.charIndex;
+                    wordElements.forEach(el => el.classList.remove('highlight-word'));
+                    for(let i = 0; i < wordBoundaries.length; i++) {
+                        if (lastSpokenCharIndex >= wordBoundaries[i].start && lastSpokenCharIndex < wordBoundaries[i].end) {
+                            wordElements[i].classList.add('highlight-word');
+                            break;
+                        }
                     }
-                }
-            };
+                };
+            }
+            
             utterance.onstart = () => { audioState = 'playing'; playIcon.classList.add('hidden'); pauseIcon.classList.remove('hidden'); audioStatus.textContent = "Đang phát..."; };
             utterance.onend = () => {
                 if (!isPausedByUser) {
                     lastSpokenCharIndex = 0; audioState = 'idle';
                     playIcon.classList.remove('hidden'); pauseIcon.classList.add('hidden');
                     audioStatus.textContent = "Nghe lại";
-                    Array.from(optionsContainer.children).forEach(button => { button.disabled = false; button.classList.remove('opacity-50', 'cursor-not-allowed'); });
-                    wordElements.forEach(el => el.classList.remove('highlight-word'));
+                    if(optionsContainer.offsetParent !== null) {
+                        Array.from(optionsContainer.children).forEach(button => { button.disabled = false; button.classList.remove('opacity-50', 'cursor-not-allowed'); });
+                    }
+                    if (transcriptContainer.offsetParent !== null) {
+                       transcriptContainer.querySelectorAll('span').forEach(el => el.classList.remove('highlight-word'));
+                    }
                 }
             };
             utterance.onerror = (e) => { audioState = 'idle'; audioStatus.textContent = "Lỗi phát âm thanh"; console.error("SpeechSynthesis Error:", e); };
