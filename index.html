@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Tích hợp Marked.js để render Markdown -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Tích hợp Chart.js để vẽ biểu đồ -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,7 +21,7 @@
         .spinner { border: 4px solid rgba(0, 0, 0, 0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #0ea5e9; animation: spin 1s ease-in-out infinite; }
         .btn-spinner { width: 20px; height: 20px; border-width: 3px; border-left-color: white; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #passageText, #transcriptContainer, #notebookList, #historyList, #reviewList, #libraryList, #writingFeedbackContainer, #reinforceContent, #learningPathContainer, #reinforcementReviewList { max-height: 60vh; overflow-y: auto; }
+        #passageText, #transcriptContainer, #notebookList, #historyList, #reviewList, #libraryList, #writingFeedbackContainer, #reinforceContent, #learningPathContainer, #reinforcementReviewList, #conversationLog { max-height: 60vh; overflow-y: auto; }
         .topic-container, .vocab-mode-container { transition: all 0.3s ease-in-out; overflow: hidden; }
         #translationModal.hidden, #confirmModal.hidden, #vocabModal.hidden, #reinforceModal.hidden { display: none; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 50; }
@@ -54,6 +56,16 @@
         .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.75rem; }
         .prose li { margin-bottom: 0.25rem; }
         .prose strong { font-weight: 600; }
+
+        /* Diagnostic Conversation Styles */
+        @keyframes mic-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(199, 210, 254, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(199, 210, 254, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(199, 210, 254, 0); }
+        }
+        .mic-recording {
+            animation: mic-pulse 1.5s infinite;
+        }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 flex items-center justify-center min-h-screen p-4">
@@ -166,7 +178,54 @@
                 </div>
             </div>
         </div>
+
+        <!-- Màn hình Chọn loại kiểm tra -->
+        <div id="assessment-choice-view" class="view">
+            <h2 class="text-3xl font-bold text-slate-800 mb-2 text-center">Chọn phương pháp kiểm tra</h2>
+            <p class="text-slate-500 text-lg mb-8 text-center">Hãy chọn cách bạn muốn AI đánh giá trình độ của mình.</p>
+            <div class="space-y-4">
+                <button id="startTraditionalTestButton" class="w-full p-6 border-2 border-slate-300 rounded-lg hover:bg-slate-100 hover:border-sky-400 transition text-left">
+                    <div class="flex items-center gap-4">
+                        <div class="text-4xl">📝</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-sky-700">Bài trắc nghiệm</h3>
+                            <p class="text-slate-600">Làm một bài kiểm tra 12 câu hỏi để đánh giá nhanh các kỹ năng.</p>
+                        </div>
+                    </div>
+                </button>
+                <button id="startDiagnosticConversationButton" class="w-full p-6 border-2 border-slate-300 rounded-lg hover:bg-slate-100 hover:border-purple-400 transition text-left">
+                    <div class="flex items-center gap-4">
+                        <div class="text-4xl">💬</div>
+                        <div>
+                            <h3 class="text-xl font-bold text-purple-700">Trò chuyện với AI</h3>
+                            <p class="text-slate-600">Tham gia một cuộc hội thoại ngắn để AI đánh giá toàn diện hơn. <span class="text-xs font-bold text-white bg-purple-500 px-2 py-1 rounded-full ml-2">NÂNG CAO</span></p>
+                        </div>
+                    </div>
+                </button>
+            </div>
+            <button id="backToSetupFromChoice" class="mt-8 w-full text-slate-600 hover:text-slate-800 font-semibold py-2 px-4 rounded-lg text-md transition">Quay lại</button>
+        </div>
         
+        <!-- Màn hình Hội thoại Chẩn đoán -->
+        <div id="diagnostic-conversation-view" class="view">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-3xl font-bold text-purple-600">Trò chuyện Chẩn đoán</h2>
+                <button id="endDiagnosticConversationButton" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg text-sm">Kết thúc</button>
+            </div>
+            <div class="min-h-[400px] flex flex-col">
+                <div id="conversationLog" class="flex-grow space-y-4 p-4 bg-slate-50 rounded-lg border mb-4 overflow-y-auto">
+                    <!-- AI and user messages will appear here -->
+                </div>
+                <div id="conversationInputArea" class="mt-auto flex items-center gap-3">
+                    <button id="micButton" class="p-4 rounded-full bg-indigo-200 hover:bg-indigo-300 text-indigo-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
+                    </button>
+                    <input type="text" id="conversationTextInput" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500" placeholder="Hoặc gõ câu trả lời của bạn ở đây...">
+                    <button id="sendTextButton" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg">Gửi</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Màn hình Lộ trình học tập -->
         <div id="learning-path-view" class="view">
             <div class="flex justify-between items-center mb-4">
@@ -291,7 +350,7 @@
             <div id="reviewList" class="space-y-4"></div>
         </div>
         
-        <!-- **NEW** Màn hình Ôn tập & Củng cố -->
+        <!-- Màn hình Ôn tập & Củng cố -->
         <div id="reinforcement-view" class="view">
              <div class="flex justify-between items-center mb-6">
                 <h2 class="text-3xl font-bold text-orange-600">Ôn tập & Củng cố</h2>
@@ -309,6 +368,7 @@
             <div id="placementResultContainer" class="bg-indigo-100 border-2 border-indigo-300 rounded-xl p-8 mb-8 text-left">
                 <div class="spinner mx-auto"></div>
             </div>
+            <div id="diagnosticChartContainer" class="hidden my-6"><canvas id="diagnosticChart"></canvas></div>
             <button id="createPathButton" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-4 px-4 rounded-lg text-xl transition hidden">Tạo Lộ trình Học tập cho tôi</button>
             <button id="backToSetupFromPlacement" class="mt-4 w-full text-slate-600 hover:text-slate-800 font-semibold py-2 px-4 rounded-lg text-md transition">Quay lại sau</button>
         </div>
@@ -423,6 +483,18 @@
         const reinforcementReviewList = document.getElementById('reinforcementReviewList');
         const backToPathFromReinforcement = document.getElementById('backToPathFromReinforcement');
         const retryPathStepFromReinforcement = document.getElementById('retryPathStepFromReinforcement');
+        const assessmentChoiceView = document.getElementById('assessment-choice-view');
+        const startTraditionalTestButton = document.getElementById('startTraditionalTestButton');
+        const startDiagnosticConversationButton = document.getElementById('startDiagnosticConversationButton');
+        const backToSetupFromChoice = document.getElementById('backToSetupFromChoice');
+        const conversationLog = document.getElementById('conversationLog');
+        const conversationInputArea = document.getElementById('conversationInputArea');
+        const micButton = document.getElementById('micButton');
+        const conversationTextInput = document.getElementById('conversationTextInput');
+        const sendTextButton = document.getElementById('sendTextButton');
+        const endDiagnosticConversationButton = document.getElementById('endDiagnosticConversationButton');
+        const diagnosticChartContainer = document.getElementById('diagnosticChartContainer');
+        const diagnosticChartCanvas = document.getElementById('diagnosticChart');
 
 
         // App State
@@ -437,8 +509,11 @@
             correctPairs: 0
         };
         let autoAdvanceTimer = null;
-        let currentQuizType = 'standard'; // 'standard', 'placement', or 'path'
+        let currentQuizType = 'standard'; // 'standard', 'placement', 'path', 'diagnostic'
         let currentUserPath = null;
+        let diagnosticConversationState = {};
+        let recognition;
+        let chartInstance;
         
         // Audio State
         const synth = window.speechSynthesis;
@@ -682,6 +757,39 @@
             \`\`\``;
         }
 
+        // **NEW** Prompt for Diagnostic Conversation Analysis
+        function getDiagnosticAnalysisPrompt(conversationData) {
+            const dataString = JSON.stringify(conversationData, null, 2);
+            return `You are a master English language assessor AI. A user has just completed a diagnostic conversation. Here is the transcript and data collected:
+            \`\`\`json
+            ${dataString}
+            \`\`\`
+            Based on ALL the provided data, perform a holistic analysis. Your response MUST be a JSON object wrapped in a 'json' markdown code block with the following structure:
+            1.  "overallLevel": A string representing the user's overall CEFR level (e.g., "A2", "B1", "B2").
+            2.  "skillsProfile": An object with scores from 0 to 100 for the following five skills:
+                - "pronunciation": Assess based on the clarity and accuracy of their spoken responses.
+                - "fluency": Assess the smoothness and speed of their speech.
+                - "listening": Assess their ability to understand the AI's spoken questions.
+                - "vocabulary": Assess the range and appropriateness of words used in both spoken and written tasks.
+                - "grammar": Assess the grammatical accuracy of their spoken and written sentences.
+            3.  "analysis": A detailed, friendly analysis in VIETNAMESE (3-4 sentences). Start by stating their overall level, then highlight their main strength and pinpoint their biggest area for improvement, giving a specific example from the conversation if possible.
+            
+            Example of the required JSON output:
+            \`\`\`json
+            {
+              "overallLevel": "B1",
+              "skillsProfile": {
+                "pronunciation": 75,
+                "fluency": 60,
+                "listening": 80,
+                "vocabulary": 65,
+                "grammar": 70
+              },
+              "analysis": "Trình độ của bạn ở khoảng B1. Bạn có khả năng nghe hiểu tốt và phát âm khá rõ ràng. Tuy nhiên, bạn cần cải thiện sự trôi chảy khi nói và mở rộng vốn từ vựng, ví dụ như trong phần mô tả bức tranh, bạn có thể dùng các tính từ đa dạng hơn."
+            }
+            \`\`\``;
+        }
+
         function getFlashcardPrompt(level, topic, count) { return `You are an expert English teacher. Generate ${count} flashcards for an English learner at the ${level} CEFR level. The topic is "${topic}". For each card, provide the English "word", its IPA transcription in the "ipa" field, its Vietnamese "meaning", and an "example" sentence in English using the word. You MUST wrap your entire response in a 'json' markdown code block. The structure MUST be a valid JSON array of objects: \`\`\`json\n[ { "type": "flashcard", "word": "sustainable", "ipa": "/səˈsteɪnəbl/", "meaning": "bền vững", "example": "We need to find more sustainable sources of energy." } ]\n\`\`\``; }
         function getMatchingPrompt(level, topic, pairCount) { return `You are an expert English teacher. Generate a single 'matching' game question for an English learner at the ${level} CEFR level. The topic is "${topic}". The question object must have a "type" of "matching" and a "pairs" array containing ${pairCount} objects. Each object in the "pairs" array must have an English "word" and its Vietnamese "meaning". You MUST wrap your entire response in a 'json' markdown code block. The structure MUST be a valid JSON object inside a single-element array: \`\`\`json\n[ { "type": "matching", "pairs": [ { "word": "computer", "meaning": "máy vi tính" }, { "word": "keyboard", "meaning": "bàn phím" } ] } ]\n\`\`\``; }
         function getWordScramblePrompt(level, topic, count) { return `You are an expert English teacher. Generate ${count} 'word scramble' questions for an English learner at the ${level} CEFR level. The topic is "${topic}". For each question, provide a "clue" which is a helpful hint or definition IN VIETNAMESE, and the "answer" which is the single English word to be scrambled. The answer must not contain spaces. You MUST wrap your entire response in a 'json' markdown code block. The structure MUST be a valid JSON array of objects: \`\`\`json\n[ { "type": "word_scramble", "clue": "Một loại trái cây màu đỏ, thường dùng làm salad.", "answer": "tomato" } ]\n\`\`\``; }
@@ -851,7 +959,6 @@
 
                 if (auth.currentUser) {
                     if (currentQuizType === 'path') {
-                        // **FIXED** Pass the score and total to the completion handler
                         await handlePathStepCompletion(feedbackData.score, 100);
                     } else {
                          await saveWritingResult(userText, feedbackData);
@@ -1390,7 +1497,7 @@
             if (currentQuestionIndex < total) {
                 renderQuiz();
             } else {
-                if (currentQuizType === 'placement') {
+                if (currentQuizType === 'placement' || currentQuizType === 'diagnostic') {
                     showPlacementResult();
                 } else if (currentQuizType === 'path') {
                     handlePathStepCompletion(score, total);
@@ -1446,19 +1553,28 @@
         async function showPlacementResult() {
             showView('placement-result-view');
             placementResultContainer.innerHTML = '<div class="spinner mx-auto"></div>';
+            diagnosticChartContainer.classList.add('hidden');
             try {
-                const prompt = getPlacementAnalysisPrompt(sessionResults);
-                const result = await model.generateContent(prompt);
-                const analysisData = extractAndParseJson(result.response.text());
-
-                if (!analysisData || !analysisData.level || !analysisData.analysis) {
-                    throw new Error("AI did not return a valid analysis.");
+                let analysisData;
+                if(currentQuizType === 'diagnostic') {
+                    const prompt = getDiagnosticAnalysisPrompt(diagnosticConversationState.history);
+                    const result = await model.generateContent(prompt);
+                    analysisData = extractAndParseJson(result.response.text());
+                    if (!analysisData) throw new Error("AI did not return a valid diagnostic analysis.");
+                    
+                    renderDiagnosticChart(analysisData.skillsProfile);
+                    diagnosticChartContainer.classList.remove('hidden');
+                } else {
+                    const prompt = getPlacementAnalysisPrompt(sessionResults);
+                    const result = await model.generateContent(prompt);
+                    analysisData = extractAndParseJson(result.response.text());
+                    if (!analysisData) throw new Error("AI did not return a valid placement analysis.");
                 }
 
                 placementResultContainer.innerHTML = `
                     <div class="text-center mb-4">
                         <p class="text-lg font-semibold text-indigo-800">Trình độ ước tính của bạn</p>
-                        <p class="text-6xl font-bold text-indigo-600">${analysisData.level.toUpperCase()}</p>
+                        <p class="text-6xl font-bold text-indigo-600">${analysisData.level || analysisData.overallLevel}</p>
                     </div>
                     <div>
                         <h4 class="text-lg font-bold text-slate-800 mb-2">Phân tích từ AI</h4>
@@ -1472,11 +1588,12 @@
                     await setDoc(pathRef, {
                         userId: auth.currentUser.uid,
                         placementTestResult: {
-                            level: analysisData.level,
+                            level: analysisData.level || analysisData.overallLevel,
                             analysis: analysisData.analysis,
                             score: score,
                             totalQuestions: sessionResults.length,
-                            completedAt: serverTimestamp()
+                            completedAt: serverTimestamp(),
+                            type: currentQuizType
                         },
                         status: 'pending_generation'
                     }, { merge: true });
@@ -1487,6 +1604,66 @@
             }
         }
         
+        // --- NEW: Chart Rendering Function ---
+        function renderDiagnosticChart(skillsProfile) {
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+            const ctx = diagnosticChartCanvas.getContext('2d');
+            const data = {
+                labels: ['Phát âm', 'Lưu loát', 'Nghe', 'Từ vựng', 'Ngữ pháp'],
+                datasets: [{
+                    label: 'Điểm kỹ năng',
+                    data: [
+                        skillsProfile.pronunciation,
+                        skillsProfile.fluency,
+                        skillsProfile.listening,
+                        skillsProfile.vocabulary,
+                        skillsProfile.grammar
+                    ],
+                    fill: true,
+                    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                    borderColor: 'rgb(99, 102, 241)',
+                    pointBackgroundColor: 'rgb(99, 102, 241)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgb(99, 102, 241)'
+                }]
+            };
+            const config = {
+                type: 'radar',
+                data: data,
+                options: {
+                    elements: {
+                        line: {
+                            borderWidth: 3
+                        }
+                    },
+                    scales: {
+                        r: {
+                            angleLines: {
+                                display: false
+                            },
+                            suggestedMin: 0,
+                            suggestedMax: 100,
+                            pointLabels: {
+                                font: {
+                                    size: 14,
+                                    family: "'Be Vietnam Pro', sans-serif"
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            };
+            chartInstance = new Chart(ctx, config);
+        }
+
         // --- Learning Path Functions ---
         function showGoalSetting() {
             goalOptionsContainer.innerHTML = '';
@@ -1613,11 +1790,12 @@
         async function handlePathStepCompletion(achievedScore, totalScore) {
             if (!auth.currentUser || !currentUserPath) return;
 
+            const step = currentUserPath.path[currentUserPath.currentStep];
             const percentage = totalScore > 0 ? (achievedScore / totalScore) * 100 : 0;
             const passingThreshold = 70; // 70% to pass
 
             showView('result-view');
-            
+
             if (percentage >= passingThreshold) {
                 // Passed the step
                 const newStep = currentUserPath.currentStep + 1;
@@ -1629,9 +1807,18 @@
                     resultScoreContainer.innerHTML = `<p class="text-2xl font-semibold mb-2 text-teal-700">Hoàn thành bước!</p><p class="text-6xl font-bold text-teal-600">🎉</p>`;
                     finalScore.textContent = `${achievedScore} / ${totalScore}`;
                     resultMessage.textContent = "Làm tốt lắm! Bạn đã mở khóa bước tiếp theo trong lộ trình của mình.";
-                    
+
                     playAgainButton.textContent = "Tiếp tục Lộ trình";
                     playAgainButton.onclick = showLearningPath;
+
+                    // When passing, allow reviewing answers for quizzes, or feedback for writing
+                    if (step.type === 'writing') {
+                        reviewAnswersButton.textContent = "Xem lại Phản hồi";
+                        reviewAnswersButton.onclick = () => showView('writing-view');
+                    } else {
+                        reviewAnswersButton.textContent = "Xem lại Bài làm";
+                        reviewAnswersButton.onclick = () => showReviewPage(sessionResults, quizData.raw, 'result-view');
+                    }
                     reviewAnswersButton.classList.remove('hidden');
                     viewHistoryFromResultButton.classList.add('hidden');
 
@@ -1643,12 +1830,18 @@
                 resultScoreContainer.innerHTML = `<p class="text-2xl font-semibold mb-2 text-orange-700">Chưa đạt!</p><p class="text-6xl font-bold text-orange-600">💪</p>`;
                 finalScore.textContent = `${achievedScore} / ${totalScore}`;
                 resultMessage.textContent = `Bạn cần đạt ít nhất ${passingThreshold}% để qua bước này. Hãy cố gắng ôn tập và làm lại nhé!`;
-                
+
                 playAgainButton.textContent = "Thử lại ngay";
                 playAgainButton.onclick = startPathStep;
 
-                reviewAnswersButton.textContent = "Xem lại & Ôn tập";
-                reviewAnswersButton.onclick = showReinforcementView;
+                // If failed a writing step, review the feedback. If failed a quiz, go to reinforcement.
+                if (step.type === 'writing') {
+                    reviewAnswersButton.textContent = "Xem lại Phản hồi";
+                    reviewAnswersButton.onclick = () => showView('writing-view');
+                } else {
+                    reviewAnswersButton.textContent = "Xem lại & Ôn tập";
+                    reviewAnswersButton.onclick = showReinforcementView;
+                }
                 reviewAnswersButton.classList.remove('hidden');
                 viewHistoryFromResultButton.classList.add('hidden');
             }
@@ -1659,7 +1852,7 @@
             const incorrectAnswers = sessionResults.filter(r => !r.isCorrect);
 
             if (incorrectAnswers.length === 0) {
-                reinforcementReviewList.innerHTML = '<p class="text-center text-slate-500">Tuyệt vời, bạn không làm sai câu nào!</p>';
+                reinforcementReviewList.innerHTML = '<p class="text-center text-slate-500">Tuyệt vời, bạn không làm sai câu nào trong lần thử này!</p>';
             } else {
                 incorrectAnswers.forEach((result, index) => {
                     const item = document.createElement('div');
@@ -2110,6 +2303,131 @@
             } catch (error) { console.error("Error loading related vocabulary:", error); showError("Không thể tải danh sách từ vựng."); }
         }
         
+        // --- Diagnostic Conversation Functions ---
+        function initSpeechRecognition() {
+            window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!window.SpeechRecognition) {
+                alert("Rất tiếc, trình duyệt của bạn không hỗ trợ nhận dạng giọng nói. Vui lòng sử dụng Chrome hoặc Edge.");
+                micButton.disabled = true;
+                return;
+            }
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                handleUserResponse(transcript, 'speech');
+            };
+
+            recognition.onspeechend = () => {
+                recognition.stop();
+            };
+
+            recognition.onend = () => {
+                micButton.classList.remove('mic-recording', 'bg-red-400');
+                micButton.disabled = false;
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Speech recognition error", event.error);
+                micButton.classList.remove('mic-recording', 'bg-red-400');
+                micButton.disabled = false;
+            };
+        }
+
+        function addMessageToLog(sender, text, type = 'text') {
+            const messageDiv = document.createElement('div');
+            let contentHTML = '';
+            if (type === 'speech') {
+                contentHTML = `<p class="p-3 rounded-lg bg-indigo-100 text-indigo-800">${text}</p>`;
+            } else {
+                contentHTML = `<p class="p-3 rounded-lg ${sender === 'ai' ? 'bg-slate-200 text-slate-800' : 'bg-indigo-100 text-indigo-800'}">${text}</p>`;
+            }
+
+            messageDiv.innerHTML = `
+                <div class="font-bold text-sm mb-1 ${sender === 'ai' ? 'text-slate-600' : 'text-indigo-600'}">${sender === 'ai' ? 'AI' : 'Bạn'}</div>
+                ${contentHTML}
+            `;
+            conversationLog.appendChild(messageDiv);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+
+            if (sender === 'user') {
+                diagnosticConversationState.history.push({ role: 'user', text: text, inputType: type });
+            } else { // AI
+                diagnosticConversationState.history.push({ role: 'ai', text: text });
+            }
+        }
+
+        async function handleUserResponse(text, type = 'text') {
+            if (!text.trim()) return;
+
+            addMessageToLog('user', text, type);
+            conversationTextInput.value = '';
+            conversationInputArea.classList.add('hidden'); // Hide input while AI is thinking
+
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.innerHTML = `
+                <div class="font-bold text-sm mb-1 text-slate-600">AI</div>
+                <div class="p-3 rounded-lg bg-slate-200 text-slate-800">
+                    <div class="spinner h-5 w-5 border-2 border-left-color-slate-400"></div>
+                </div>`;
+            conversationLog.appendChild(thinkingDiv);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+
+            try {
+                const history = diagnosticConversationState.history.map(h => `${h.role}: ${h.text}`).join('\n');
+                const prompt = `This is a diagnostic conversation. The user just said: "${text}". The history is:\n${history}\n\nAsk a follow-up question to gauge their English level. If the conversation has had more than 6 turns, say "Thank you! I have enough information now. I will now analyze your results."`;
+                
+                const result = await fastModel.generateContent(prompt);
+                const aiResponse = result.response.text();
+
+                conversationLog.removeChild(thinkingDiv);
+                addMessageToLog('ai', aiResponse);
+                playSpeech(aiResponse);
+
+                if (aiResponse.includes("analyze your results")) {
+                    endDiagnosticConversationButton.textContent = "Xem kết quả";
+                    endDiagnosticConversationButton.onclick = showPlacementResult;
+                } else {
+                    conversationInputArea.classList.remove('hidden');
+                }
+
+            } catch (error) {
+                console.error("Error in diagnostic conversation:", error);
+                conversationLog.removeChild(thinkingDiv);
+                addMessageToLog('ai', "I'm sorry, I encountered an error. Let's end the conversation here.");
+                endDiagnosticConversationButton.textContent = "Kết thúc";
+                endDiagnosticConversationButton.onclick = () => showView('setup-view');
+            }
+        }
+
+        async function startDiagnosticConversation() {
+            currentQuizType = 'diagnostic';
+            sessionResults = [];
+            score = 0;
+            diagnosticConversationState = {
+                history: [],
+                startTime: new Date()
+            };
+
+            showView('diagnostic-conversation-view');
+            conversationLog.innerHTML = '';
+            conversationInputArea.classList.remove('hidden');
+            endDiagnosticConversationButton.textContent = "Kết thúc";
+            endDiagnosticConversationButton.onclick = () => {
+                if(recognition) recognition.stop();
+                if(synth.speaking) synth.cancel();
+                showView('setup-view');
+            };
+
+            const initialPrompt = "Let's start with a simple question. What did you do last weekend?";
+            addMessageToLog('ai', initialPrompt);
+            playSpeech(initialPrompt);
+        }
+
         // --- Event Listeners & Setup ---
         function handleQuizTypeChange() {
             const selectedType = quizTypeSelect.value;
@@ -2195,7 +2513,18 @@
         reinforceModal.addEventListener('click', (e) => { if (e.target === reinforceModal) { reinforceModal.classList.add('hidden'); } });
 
         // --- Learning Path Event Listeners ---
-        startPlacementTestButton.addEventListener('click', startPlacementTest);
+        startPlacementTestButton.addEventListener('click', () => showView('assessment-choice-view'));
+        backToSetupFromChoice.addEventListener('click', () => showView('setup-view'));
+        startTraditionalTestButton.addEventListener('click', startPlacementTest);
+        startDiagnosticConversationButton.addEventListener('click', () => {
+            startDiagnosticConversation();
+        });
+        endDiagnosticConversationButton.addEventListener('click', () => {
+            if(recognition) recognition.stop();
+            if(synth.speaking) synth.cancel();
+            showView('setup-view');
+        });
+
         backToSetupFromPlacement.addEventListener('click', () => showView('setup-view'));
         createPathButton.addEventListener('click', showGoalSetting);
         continuePathButton.addEventListener('click', showLearningPath);
@@ -2204,13 +2533,33 @@
         retryPathStepFromReinforcement.addEventListener('click', startPathStep);
         
         appContainer.addEventListener('click', (e) => {
-            if (e.target && e.target.classList.contains('start-step-btn')) {
+            if (e.target && e.target.closest('.start-step-btn')) {
                 startPathStep();
             }
-            if (e.target && e.target.classList.contains('reinforce-btn')) {
-                const resultIndex = parseInt(e.target.dataset.questionIndex, 10);
+            if (e.target && e.target.closest('.reinforce-btn')) {
+                const resultIndex = parseInt(e.target.closest('.reinforce-btn').dataset.questionIndex, 10);
                 const result = sessionResults[resultIndex];
                 requestReinforcement(result.question, result.userAnswer);
+            }
+        });
+
+        // --- Diagnostic Conversation Event Listeners ---
+        micButton.addEventListener('click', () => {
+            if (!recognition) {
+                initSpeechRecognition();
+                if(!recognition) return;
+            }
+            micButton.classList.add('mic-recording', 'bg-red-400');
+            micButton.disabled = true;
+            recognition.start();
+        });
+
+        sendTextButton.addEventListener('click', () => {
+            handleUserResponse(conversationTextInput.value);
+        });
+        conversationTextInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                handleUserResponse(conversationTextInput.value);
             }
         });
 
