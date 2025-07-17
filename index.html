@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- Tích hợp Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- FIXED: Tích hợp Tone.js cho hiệu ứng âm thanh từ CDN phù hợp -->
+    <!-- Tích hợp Tone.js cho hiệu ứng âm thanh -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,15 +29,12 @@
         .topic-container, .vocab-mode-container, #customTopicContainer { transition: all 0.3s ease-in-out; overflow: hidden; }
 
         /* --- Cải tiến UI/UX --- */
-
-        /* Hiệu ứng cho nút đáp án */
         @keyframes jiggle { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
         
         .option-btn.correct { animation: jiggle 0.4s ease-in-out; }
         .option-btn.incorrect { animation: shake 0.4s ease-in-out; }
 
-        /* Cải tiến Modal */
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background-color: rgba(0, 0, 0, 0.6);
@@ -47,34 +44,24 @@
             visibility: hidden;
             transition: opacity 0.3s, visibility 0.3s;
         }
-        .modal-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
         .modal-content {
-            background-color: white;
-            padding: 2rem;
-            border-radius: 1.25rem;
-            max-width: 90%;
-            width: 600px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-            position: relative;
-            transform: scale(0.95) translateY(10px);
-            opacity: 0;
+            background-color: white; padding: 2rem; border-radius: 1.25rem;
+            max-width: 90%; width: 600px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            position: relative; transform: scale(0.95) translateY(10px); opacity: 0;
             transition: transform 0.3s ease-out, opacity 0.3s ease-out;
         }
-        .modal-overlay.active .modal-content {
-            transform: scale(1) translateY(0);
-            opacity: 1;
-        }
+        .modal-overlay.active .modal-content { transform: scale(1) translateY(0); opacity: 1; }
 
         .translate-icon { cursor: pointer; color: #3b82f6; margin-left: 8px; font-size: 1.25rem; display: inline-block; vertical-align: middle; }
-        .info-icon { cursor: pointer; background-color: #dbeafe; color: #3b82f6; border-radius: 50%; width: 22px; height: 22px; font-style: normal; font-weight: bold; display: flex; align-items: center; justify-content: center; margin-left: auto; }
         .highlight-word { background-color: #facc15; color: #1f2937; padding: 2px 0; border-radius: 3px; }
-        .save-word-btn { cursor: pointer; color: #64748b; margin-left: 1rem; font-size: 1.5rem; }
-        .save-word-btn:hover { color: #0ea5e9; }
-        .save-word-btn.saved { color: #22c55e; cursor: not-allowed; }
         
+        /* --- NEW: Word Lookup Styles --- */
+        .lookup-word { cursor: pointer; }
+        .lookup-word:hover { background-color: #e0f2fe; }
+        .saved-word-highlight { border-bottom: 2px dotted #22c55e; cursor: help; }
+        .saved-word-highlight:hover { background-color: #dcfce7; }
+
         /* Flashcard Styles */
         .flashcard-container { perspective: 1000px; }
         .flashcard { width: 100%; min-height: 250px; position: relative; transform-style: preserve-3d; transition: transform 0.6s; cursor: pointer; }
@@ -100,9 +87,7 @@
             70% { box-shadow: 0 0 0 20px rgba(199, 210, 254, 0); }
             100% { box-shadow: 0 0 0 0 rgba(199, 210, 254, 0); }
         }
-        .mic-recording {
-            animation: mic-pulse 1.5s infinite;
-        }
+        .mic-recording { animation: mic-pulse 1.5s infinite; }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 flex items-center justify-center min-h-screen p-4">
@@ -421,7 +406,7 @@
         </div>
     </div>
     
-    <!-- Modal hiển thị bản dịch -->
+    <!-- Modals -->
     <div id="translationModal" class="modal-overlay">
         <div class="modal-content">
             <h3 class="text-xl font-bold text-slate-800 mb-4">Bản dịch</h3>
@@ -432,7 +417,6 @@
         </div>
     </div>
 
-    <!-- Modal xác nhận -->
     <div id="confirmModal" class="modal-overlay">
         <div class="modal-content">
             <h3 id="confirmTitle" class="text-xl font-bold text-slate-800 mb-2">Xác nhận</h3>
@@ -444,7 +428,6 @@
         </div>
     </div>
 
-    <!-- Modal Từ vựng liên quan -->
     <div id="vocabModal" class="modal-overlay">
         <div class="modal-content !p-0">
             <div class="flex justify-between items-center p-6 border-b border-slate-200">
@@ -455,7 +438,6 @@
         </div>
     </div>
 
-    <!-- Modal Củng cố Kiến thức -->
     <div id="reinforceModal" class="modal-overlay">
         <div class="modal-content">
             <div class="flex justify-between items-center pb-4 border-b mb-4">
@@ -465,6 +447,20 @@
             <div id="reinforceContent" class="space-y-4">
                 <div class="spinner mx-auto"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- NEW: Word Info Modal -->
+    <div id="wordInfoModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="flex justify-between items-center pb-4 border-b mb-4">
+                <h3 id="wordInfoTitle" class="text-2xl font-bold text-sky-600"></h3>
+                <button id="closeWordInfoModal" class="text-2xl font-bold text-slate-400 hover:text-red-500">&times;</button>
+            </div>
+            <div id="wordInfoContent" class="space-y-4 min-h-[100px]">
+                <div class="spinner mx-auto"></div>
+            </div>
+            <button id="saveWordFromInfoBtn" class="mt-6 w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-4 rounded-lg text-lg transition disabled:bg-teal-300 disabled:cursor-not-allowed">Lưu vào sổ tay</button>
         </div>
     </div>
 
@@ -497,7 +493,6 @@
             db = getFirestore(app);
             const ai = getAI(app, { backend: new GoogleAIBackend() });
             
-            // FIXED: Corrected model names to valid ones for the web SDK
             model = getGenerativeModel(ai, { model: "gemini-2.5-flash" });
             fastModel = getGenerativeModel(ai, { model: "gemini-2.0-flash" });
 
@@ -507,7 +502,7 @@
 
         // DOM Elements
         const appContainer = document.getElementById('appContainer');
-        const welcomeMessage = document.getElementById('welcomeMessage'), emailInput = document.getElementById('emailInput'), passwordInput = document.getElementById('passwordInput'), loginButton = document.getElementById('loginButton'), registerButton = document.getElementById('registerButton'), logoutButton = document.getElementById('logoutButton'), authError = document.getElementById('authError'), quizTypeSelect = document.getElementById('quizTypeSelect'), vocabModeContainer = document.getElementById('vocabModeContainer'), vocabModeSelect = document.getElementById('vocabModeSelect'), topicContainer = document.getElementById('topicContainer'), topicSelect = document.getElementById('topicSelect'), levelSelect = document.getElementById('levelSelect'), questionCountContainer = document.getElementById('questionCountContainer'), questionCountSelect = document.getElementById('questionCountSelect'), startQuizButton = document.getElementById('startQuizButton'), showHistoryButton = document.getElementById('showHistoryButton'), showNotebookButton = document.getElementById('showNotebookButton'), showLibraryButton = document.getElementById('showLibraryButton'), libraryList = document.getElementById('libraryList'), backToSetupFromLibrary = document.getElementById('backToSetupFromLibrary'), notebookList = document.getElementById('notebookList'), backToSetupFromNotebook = document.getElementById('backToSetupFromNotebook'), historyDashboard = document.getElementById('historyDashboard'), recommendationsContainer = document.getElementById('recommendationsContainer'), historyFilters = document.getElementById('historyFilters'), filterSkill = document.getElementById('filterSkill'), filterLevel = document.getElementById('filterLevel'), historyList = document.getElementById('historyList'), backToSetupFromHistory = document.getElementById('backToSetupFromHistory'), loadingTopic = document.getElementById('loadingTopic'), loadingTitle = document.getElementById('loadingTitle'), loadingMessage = document.getElementById('loadingMessage'), quizTitle = document.getElementById('quizTitle'), quizSubtitle = document.getElementById('quizSubtitle'), progress = document.getElementById('progress'), scoreEl = document.getElementById('score'), progressBar = document.getElementById('progressBar'), audioPlayerContainer = document.getElementById('audioPlayerContainer'), playAudioBtn = document.getElementById('playAudioBtn'), playIcon = document.getElementById('playIcon'), pauseIcon = document.getElementById('pauseIcon'), audioStatus = document.getElementById('audioStatus'), transcriptControls = document.getElementById('transcriptControls'), showTranscriptBtn = document.getElementById('showTranscriptBtn'), transcriptContainer = document.getElementById('transcriptContainer'), passageContainer = document.getElementById('passageContainer'), passageText = document.getElementById('passageText'), questionText = document.getElementById('questionText'), translateQuestionBtn = document.getElementById('translateQuestionBtn'), optionsContainer = document.getElementById('optionsContainer'), feedbackContainer = document.getElementById('feedbackContainer'), nextQuestionButton = document.getElementById('nextQuestionButton'), playAgainButton = document.getElementById('playAgainButton'), reviewAnswersButton = document.getElementById('reviewAnswersButton'), reviewList = document.getElementById('reviewList'), backToPreviousViewButton = document.getElementById('backToPreviousViewButton'), viewHistoryFromResultButton = document.getElementById('viewHistoryFromResultButton'), finalScore = document.getElementById('finalScore'), resultMessage = document.getElementById('resultMessage'), resultScoreContainer = document.getElementById('resultScoreContainer'), errorMessage = document.getElementById('errorMessage'), backToSetupButton = document.getElementById('backToSetupButton'), streakCount = document.getElementById('streakCount'), translationModal = document.getElementById('translationModal'), translationResult = document.getElementById('translationResult'), closeTranslationModal = document.getElementById('closeTranslationModal'), confirmModal = document.getElementById('confirmModal'), confirmTitle = document.getElementById('confirmTitle'), confirmMessage = document.getElementById('confirmMessage'), confirmCancelBtn = document.getElementById('confirmCancelBtn'), confirmOkBtn = document.getElementById('confirmOkBtn'), vocabModal = document.getElementById('vocabModal'), vocabList = document.getElementById('vocabList'), closeVocabModal = document.getElementById('closeVocabModal');
+        const welcomeMessage = document.getElementById('welcomeMessage'), emailInput = document.getElementById('emailInput'), passwordInput = document.getElementById('passwordInput'), loginButton = document.getElementById('loginButton'), registerButton = document.getElementById('registerButton'), logoutButton = document.getElementById('logoutButton'), authError = document.getElementById('authError'), quizTypeSelect = document.getElementById('quizTypeSelect'), vocabModeContainer = document.getElementById('vocabModeContainer'), vocabModeSelect = document.getElementById('vocabModeSelect'), topicContainer = document.getElementById('topicContainer'), topicSelect = document.getElementById('topicSelect'), levelSelect = document.getElementById('levelSelect'), questionCountContainer = document.getElementById('questionCountContainer'), questionCountSelect = document.getElementById('questionCountSelect'), startQuizButton = document.getElementById('startQuizButton'), showHistoryButton = document.getElementById('showHistoryButton'), showNotebookButton = document.getElementById('showNotebookButton'), showLibraryButton = document.getElementById('showLibraryButton'), libraryList = document.getElementById('libraryList'), backToSetupFromLibrary = document.getElementById('backToSetupFromLibrary'), notebookList = document.getElementById('notebookList'), backToSetupFromNotebook = document.getElementById('backToSetupFromNotebook'), historyDashboard = document.getElementById('historyDashboard'), recommendationsContainer = document.getElementById('recommendationsContainer'), historyFilters = document.getElementById('historyFilters'), filterSkill = document.getElementById('filterSkill'), filterLevel = document.getElementById('filterLevel'), historyList = document.getElementById('historyList'), backToSetupFromHistory = document.getElementById('backToSetupFromHistory'), loadingTopic = document.getElementById('loadingTopic'), loadingTitle = document.getElementById('loadingTitle'), loadingMessage = document.getElementById('loadingMessage'), quizTitle = document.getElementById('quizTitle'), quizSubtitle = document.getElementById('quizSubtitle'), progress = document.getElementById('progress'), scoreEl = document.getElementById('score'), progressBar = document.getElementById('progressBar'), audioPlayerContainer = document.getElementById('audioPlayerContainer'), playAudioBtn = document.getElementById('playAudioBtn'), playIcon = document.getElementById('playIcon'), pauseIcon = document.getElementById('pauseIcon'), audioStatus = document.getElementById('audioStatus'), transcriptControls = document.getElementById('transcriptControls'), showTranscriptBtn = document.getElementById('showTranscriptBtn'), transcriptContainer = document.getElementById('transcriptContainer'), passageContainer = document.getElementById('passageContainer'), passageText = document.getElementById('passageText'), questionContainer = document.getElementById('questionContainer'), questionText = document.getElementById('questionText'), translateQuestionBtn = document.getElementById('translateQuestionBtn'), optionsContainer = document.getElementById('optionsContainer'), feedbackContainer = document.getElementById('feedbackContainer'), nextQuestionButton = document.getElementById('nextQuestionButton'), playAgainButton = document.getElementById('playAgainButton'), reviewAnswersButton = document.getElementById('reviewAnswersButton'), reviewList = document.getElementById('reviewList'), backToPreviousViewButton = document.getElementById('backToPreviousViewButton'), viewHistoryFromResultButton = document.getElementById('viewHistoryFromResultButton'), finalScore = document.getElementById('finalScore'), resultMessage = document.getElementById('resultMessage'), resultScoreContainer = document.getElementById('resultScoreContainer'), errorMessage = document.getElementById('errorMessage'), backToSetupButton = document.getElementById('backToSetupButton'), streakCount = document.getElementById('streakCount'), translationModal = document.getElementById('translationModal'), translationResult = document.getElementById('translationResult'), closeTranslationModal = document.getElementById('closeTranslationModal'), confirmModal = document.getElementById('confirmModal'), confirmTitle = document.getElementById('confirmTitle'), confirmMessage = document.getElementById('confirmMessage'), confirmCancelBtn = document.getElementById('confirmCancelBtn'), confirmOkBtn = document.getElementById('confirmOkBtn'), vocabModal = document.getElementById('vocabModal'), vocabList = document.getElementById('vocabList'), closeVocabModal = document.getElementById('closeVocabModal');
         const backToSetupFromWriting = document.getElementById('backToSetupFromWriting'), writingTopic = document.getElementById('writingTopic'), writingInput = document.getElementById('writingInput'), wordCount = document.getElementById('wordCount'), getFeedbackButton = document.getElementById('getFeedbackButton'), writingFeedbackContainer = document.getElementById('writingFeedbackContainer');
         const reinforceModal = document.getElementById('reinforceModal'), reinforceTitle = document.getElementById('reinforceTitle'), reinforceContent = document.getElementById('reinforceContent'), closeReinforceModal = document.getElementById('closeReinforceModal');
         const quickStartButton = document.getElementById('quickStartButton');
@@ -539,6 +534,12 @@
         const diagnosticChartCanvas = document.getElementById('diagnosticChart');
         const customTopicContainer = document.getElementById('customTopicContainer');
         const customTopicInput = document.getElementById('customTopicInput');
+        // NEW: Word Info Modal Elements
+        const wordInfoModal = document.getElementById('wordInfoModal');
+        const wordInfoTitle = document.getElementById('wordInfoTitle');
+        const wordInfoContent = document.getElementById('wordInfoContent');
+        const saveWordFromInfoBtn = document.getElementById('saveWordFromInfoBtn');
+        const closeWordInfoModal = document.getElementById('closeWordInfoModal');
 
 
         // App State
@@ -548,16 +549,14 @@
         let userHistoryCache = []; 
         let sessionResults = [];
         let reviewCameFrom = 'result-view'; 
-        let matchingState = {
-            selectedWordEl: null,
-            correctPairs: 0
-        };
+        let matchingState = { selectedWordEl: null, correctPairs: 0 };
         let autoAdvanceTimer = null;
         let currentQuizType = 'standard'; // 'standard', 'placement', 'path', 'diagnostic'
         let currentUserPath = null;
         let diagnosticConversationState = {};
         let recognition;
         let chartInstance;
+        let notebookWords = new Set(); // NEW: To track all saved words for highlighting
         
         // --- Audio State & Setup ---
         const synth = window.speechSynthesis;
@@ -566,7 +565,6 @@
         let isPausedByUser = false;
         let soundEffects;
 
-        // Initialize sound effects after a user interaction
         function setupAudio() {
             if (soundEffects || typeof Tone === 'undefined') return;
             soundEffects = {
@@ -580,6 +578,7 @@
         function playSound(type) {
             if (!soundEffects) return;
             try {
+                if (Tone.context.state !== 'running') { Tone.context.resume(); }
                 switch(type) {
                     case 'correct': soundEffects.correct.triggerAttackRelease("C5", "8n"); break;
                     case 'incorrect': soundEffects.incorrect.triggerAttackRelease("C3", "8n"); break;
@@ -601,7 +600,7 @@
             showView('error-view'); 
         }
 
-        // --- NEW: Improved Modal Functions ---
+        // --- Improved Modal Functions ---
         function showModal(modalElement) {
             playSound('click');
             modalElement.classList.add('active');
@@ -618,20 +617,39 @@
             const handleConfirm = () => {
                 playSound('click');
                 onConfirm();
-                hideConfirmModal();
-            };
-
-            const hideConfirmModal = () => {
                 hideModal(confirmModal);
                 confirmOkBtn.removeEventListener('click', handleConfirm);
                 confirmCancelBtn.removeEventListener('click', hideConfirmModal);
             };
 
-            confirmOkBtn.addEventListener('click', handleConfirm);
-            confirmCancelBtn.addEventListener('click', hideConfirmModal);
+            confirmCancelBtn.addEventListener('click', () => hideModal(confirmModal), { once: true });
+            confirmOkBtn.addEventListener('click', handleConfirm, { once: true });
         }
 
         // --- Auth & User State ---
+        async function fetchUserNotebook() {
+            if (!auth.currentUser) return;
+            const notebookRef = collection(db, "users", auth.currentUser.uid, "vocabulary");
+            const querySnapshot = await getDocs(query(notebookRef));
+            notebookWords = new Set(querySnapshot.docs.map(doc => doc.data().word.toLowerCase()));
+        }
+        
+        onAuthStateChanged(auth, async (user) => {
+            if (user) { 
+                welcomeMessage.textContent = `Chào mừng, ${user.email}!`; 
+                await updateUserStreak(user.uid); 
+                await checkUserLearningPath(user.uid);
+                await fetchUserNotebook(); // Fetch notebook on login
+                showView('setup-view'); 
+            } else { 
+                showView('auth-view'); 
+                userHistoryCache = []; 
+                currentUserPath = null;
+                notebookWords.clear();
+            }
+        });
+
+        // Other auth functions remain the same...
         async function checkUserLearningPath(userId) {
             const pathRef = doc(db, "learningPaths", userId);
             const docSnap = await getDoc(pathRef);
@@ -661,19 +679,6 @@
                 streakCount.textContent = currentStreak;
             } catch (error) { console.error("Error updating streak:", error); }
         }
-
-        onAuthStateChanged(auth, user => {
-            if (user) { 
-                welcomeMessage.textContent = `Chào mừng, ${user.email}!`; 
-                updateUserStreak(user.uid); 
-                checkUserLearningPath(user.uid);
-                showView('setup-view'); 
-            } else { 
-                showView('auth-view'); 
-                userHistoryCache = []; 
-                currentUserPath = null;
-            }
-        });
 
         const handleAuthAction = async (action) => {
             playSound('click');
@@ -762,6 +767,17 @@
         }
         
         // --- PROMPTS ---
+        function getWordInfoPrompt(word) {
+            return `Provide a simple Vietnamese definition and a simple English example sentence for the word "${word}". You MUST wrap your entire response in a 'json' markdown code block.
+            Example:
+            \`\`\`json
+            {
+              "definition": "một thiết bị điện tử để lưu trữ và xử lý dữ liệu",
+              "example": "I use my computer for work and study."
+            }
+            \`\`\``;
+        }
+        // Other prompts remain the same...
         function getPlacementTestPrompt() {
             return `You are an expert English assessment creator. Create a comprehensive placement test with exactly 12 multiple-choice questions to determine a user's CEFR level (from A2 to B2).
             The test MUST include:
@@ -881,6 +897,78 @@
         function getWritingTopicPrompt(level, topic) { return `You are an English teacher. Generate a single, engaging writing topic for an English learner at the ${level} CEFR level. The topic should be related to "${topic}". The topic should be a question or a statement to respond to. Provide only the topic text, without any extra labels or quotation marks. Example: "Describe your favorite kind of technology and explain why you like it."`; }
         function getWritingFeedbackPrompt(level, topic, userText) { return `You are an expert English writing evaluator. A student at the ${level} CEFR level has written the following text about the topic "${topic}". Student's text: """ ${userText} """ Please provide feedback in Vietnamese. You MUST wrap your entire response in a 'json' markdown code block. The JSON object must have the following structure: 1. "overallFeedback": A general comment in Vietnamese (2-3 sentences) on the text's content, clarity, and effort. 2. "score": An integer score from 0 to 100. 3. "correctedTextHTML": The student's original text with corrections. Use "<del>" tags for deleted parts and "<ins>" tags for added parts. This should be a single HTML string. 4. "detailedFeedback": An array of objects, where each object explains a specific mistake. Each object should have: "type", "mistake", "correction", "explanation". Example of the required JSON output: \`\`\`json\n{ "overallFeedback": "...", "score": 75, "correctedTextHTML": "...", "detailedFeedback": [ { "type": "Grammar", "mistake": "...", "correction": "...", "explanation": "..." } ] }\n\`\`\``; }
         function getReinforcementPrompt(question, userAnswer) { const level = quizData.level; const questionText = question.question || question.clue; const options = question.options ? JSON.stringify(question.options) : 'N/A'; return `You are an expert and friendly English tutor AI. A student has made a mistake on a quiz. Your task is to provide a comprehensive, easy-to-understand lesson to help them master the concept they got wrong. The student is at the ${level} CEFR level. Quiz question: - Question: "${questionText}" - Options (if any): ${options} - Correct Answer: "${question.answer}" - Student's Incorrect Answer: "${userAnswer}" Please generate a lesson in Vietnamese. You MUST wrap your entire response in a 'json' markdown code block. The JSON object must have the following structure: 1. "conceptTitle": A short, clear title for the lesson. 2. "mistakeAnalysis": A friendly explanation of why the student's answer was incorrect. 3. "conceptExplanation": A detailed but easy-to-understand explanation of the core concept. 4. "examples": An array of at least 3 distinct objects, each with an "en" and "vi" field. 5. "practiceTip": A final, encouraging tip. Example of the required JSON output: \`\`\`json\n{ "conceptTitle": "...", "mistakeAnalysis": "...", "conceptExplanation": "...", "examples": [ { "en": "...", "vi": "..." } ], "practiceTip": "..." }\n\`\`\``; }
+
+        // --- NEW: Word Lookup & Rendering ---
+        function renderTextWithClickableWords(container, text) {
+            container.innerHTML = '';
+            const words = text.split(/(\s+|[.,?!;:()])/); // Split by spaces and punctuation
+            words.forEach(word => {
+                const cleanedWord = word.trim().toLowerCase().replace(/[^a-z'-]/g, '');
+                if (cleanedWord.length > 1) { // Only make actual words clickable
+                    const span = document.createElement('span');
+                    span.textContent = word;
+                    span.className = 'lookup-word';
+                    if (notebookWords.has(cleanedWord)) {
+                        span.classList.add('saved-word-highlight');
+                    }
+                    container.appendChild(span);
+                } else {
+                    container.appendChild(document.createTextNode(word));
+                }
+            });
+        }
+
+        async function showWordInfo(word) {
+            const cleanedWord = word.trim().toLowerCase().replace(/[^a-z'-]/g, '');
+            if (!cleanedWord) return;
+
+            showModal(wordInfoModal);
+            wordInfoTitle.textContent = word.trim();
+            wordInfoContent.innerHTML = '<div class="spinner mx-auto"></div>';
+            saveWordFromInfoBtn.disabled = true;
+
+            const isSaved = notebookWords.has(cleanedWord);
+            if (isSaved) {
+                saveWordFromInfoBtn.textContent = 'Đã lưu trong sổ tay';
+            } else {
+                saveWordFromInfoBtn.textContent = 'Lưu vào sổ tay';
+                saveWordFromInfoBtn.disabled = false;
+            }
+
+            try {
+                const prompt = getWordInfoPrompt(cleanedWord);
+                const result = await fastModel.generateContent(prompt);
+                const response = await result.response;
+                const wordInfo = extractAndParseJson(response.text());
+
+                if (!wordInfo) throw new Error("Không thể lấy thông tin từ.");
+
+                wordInfoContent.innerHTML = `
+                    <p><b class="font-semibold text-slate-700">Nghĩa:</b> ${wordInfo.definition}</p>
+                    <p class="mt-2"><b class="font-semibold text-slate-700">Ví dụ:</b> <i class="text-slate-600">"${wordInfo.example}"</i></p>
+                `;
+                
+                // Re-enable save button if not already saved
+                if (!isSaved) {
+                    saveWordFromInfoBtn.onclick = () => {
+                        saveWordToNotebook(cleanedWord, wordInfo.definition, wordInfo.example);
+                        saveWordFromInfoBtn.textContent = 'Đã lưu thành công!';
+                        saveWordFromInfoBtn.disabled = true;
+                        notebookWords.add(cleanedWord);
+                        // Highlight the word in the UI
+                        document.querySelectorAll('.lookup-word').forEach(span => {
+                            if (span.textContent.trim().toLowerCase().replace(/[^a-z'-]/g, '') === cleanedWord) {
+                                span.classList.add('saved-word-highlight');
+                            }
+                        });
+                    };
+                }
+
+            } catch (error) {
+                wordInfoContent.innerHTML = `<p class="text-red-500">Rất tiếc, không thể tra cứu từ này.</p>`;
+            }
+        }
+
 
         // --- Quiz & Writing Lifecycle ---
         async function startPractice() {
@@ -1156,7 +1244,7 @@
             progressBar.style.width = `${((currentQuestionIndex + 1) / total) * 100}%`;
             
             passageContainer.classList.toggle('hidden', !isReading);
-            if (isReading) passageText.textContent = quizData.raw.passage;
+            if (isReading) renderTextWithClickableWords(passageText, quizData.raw.passage);
             audioPlayerContainer.classList.toggle('hidden', !isListening);
             transcriptControls.classList.toggle('hidden', !isListening);
             transcriptContainer.classList.add('hidden'); 
@@ -1219,7 +1307,7 @@
 
                 case 'matching':
                     translateQuestionBtn.style.display = 'none';
-                    questionText.textContent = 'Nối từ tiếng Anh với nghĩa tương ứng.';
+                    renderTextWithClickableWords(questionText, 'Nối từ tiếng Anh với nghĩa tương ứng.');
                     optionsContainer.className = 'grid grid-cols-2 gap-4';
 
                     const wordsCol = document.createElement('div');
@@ -1260,7 +1348,7 @@
 
                 case 'word_scramble':
                     translateQuestionBtn.style.display = 'none'; 
-                    questionText.textContent = currentQuestion.clue;
+                    renderTextWithClickableWords(questionText, currentQuestion.clue);
                     optionsContainer.className = 'flex flex-col items-center gap-4';
                     
                     const scrambleContainer = document.createElement('div');
@@ -1303,21 +1391,15 @@
                     break;
 
                 case 'multiple_choice':
-                    questionText.textContent = currentQuestion.question;
+                    renderTextWithClickableWords(questionText, currentQuestion.question);
                     optionsContainer.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
                     const shuffledOptions = [...currentQuestion.options].sort(() => Math.random() - 0.5);
                     shuffledOptions.forEach(option => {
                         const button = document.createElement('button');
                         button.className = "option-btn w-full text-left p-4 border-2 border-slate-300 rounded-lg hover:bg-slate-100 hover:border-sky-400 transition text-lg flex items-center justify-between";
                         const optionText = document.createElement('span');
-                        optionText.textContent = option;
-                        const infoBtn = document.createElement('i');
-                        infoBtn.className = 'info-icon';
-                        infoBtn.textContent = 'i';
-                        infoBtn.title = `Dịch nghĩa "${option}"`;
-                        infoBtn.onclick = (e) => { e.stopPropagation(); showTranslationModal(getTranslation(option)); };
+                        renderTextWithClickableWords(optionText, option); // Make words in options clickable
                         button.appendChild(optionText);
-                        button.appendChild(infoBtn);
                         button.onclick = () => handleAnswer(option);
                         if (quizData.quizType === 'listening') { button.disabled = true; button.classList.add('opacity-50', 'cursor-not-allowed'); }
                         optionsContainer.appendChild(button);
@@ -1326,7 +1408,7 @@
 
                 case 'fill_in_the_blank':
                 case 'word_formation':
-                    questionText.textContent = currentQuestion.question;
+                    renderTextWithClickableWords(questionText, currentQuestion.question);
                     optionsContainer.className = 'flex flex-col items-center gap-4';
                     const input = document.createElement('input');
                     input.type = 'text';
@@ -1454,25 +1536,7 @@
                     }
                 }
             }
-
-            if (isCorrect && currentQuizType === 'standard') {
-                if(quizData.quizType === 'vocabulary') {
-                    const wordsToSave = questionType === 'matching' ? currentQuestion.pairs : [{ word: currentQuestion.answer, definition: currentQuestion.explanation || currentQuestion.clue, example: currentQuestion.question }];
-                    
-                    wordsToSave.forEach(item => {
-                        const saveBtn = document.createElement('span');
-                        saveBtn.innerHTML = '🔖';
-                        saveBtn.className = 'save-word-btn';
-                        saveBtn.title = `Lưu từ "${item.word || item.answer}" vào sổ tay`;
-                        saveBtn.onclick = (e) => {
-                            saveWordToNotebook(item.word || item.answer, item.meaning || item.definition, item.example);
-                            e.target.classList.add('saved'); e.target.innerHTML = '✅'; e.target.onclick = null;
-                        };
-                        feedbackContainer.firstChild.appendChild(saveBtn);
-                    });
-                }
-            }
-
+            
             scoreEl.textContent = `Điểm: ${score}`;
             
             if (autoAdvanceCheckbox.checked && currentQuizType === 'standard') {
@@ -2155,12 +2219,18 @@
         // --- Notebook Functions ---
         async function saveWordToNotebook(word, definition, example) {
             if (!auth.currentUser) return;
+            const cleanedWord = word.toLowerCase();
+            if (notebookWords.has(cleanedWord)) return; // Don't save duplicates
+
             const notebookRef = collection(db, "users", auth.currentUser.uid, "vocabulary");
             try {
                 await addDoc(notebookRef, {
-                    word: word || 'Không xác định', definition: definition || 'Chưa có giải thích.',
-                    example: example || 'Chưa có câu ví dụ.', addedAt: serverTimestamp()
+                    word: cleanedWord, 
+                    definition: definition || 'Chưa có giải thích.',
+                    example: example || 'Chưa có câu ví dụ.', 
+                    addedAt: serverTimestamp()
                 });
+                notebookWords.add(cleanedWord); // Update local cache
             } catch (error) { console.error("Error saving word:", error); }
         }
 
@@ -2173,24 +2243,28 @@
                 const q = query(notebookRef);
                 const querySnapshot = await getDocs(q);
                 if (querySnapshot.empty) {
-                    notebookList.innerHTML = '<p class="text-center text-slate-500">Sổ tay của bạn còn trống.</p>';
+                    notebookList.innerHTML = '<p class="text-center text-slate-500">Sổ tay của bạn còn trống. Hãy nhấn vào các từ trong bài tập để lưu nhé!</p>';
                     return;
                 }
                 notebookList.innerHTML = '';
-                querySnapshot.forEach((docSnapshot) => {
-                    const wordData = docSnapshot.data();
-                    const wordId = docSnapshot.id;
-                    const card = document.createElement('div');
-                    card.className = 'bg-teal-50 p-4 rounded-lg border border-teal-200';
-                    card.innerHTML = `<div class="flex justify-between items-start"><div><h4 class="text-xl font-bold text-teal-800">${wordData.word}</h4><p class="text-slate-600">${wordData.definition}</p><p class="text-sm text-slate-500 italic mt-2">"${wordData.example}"</p></div><button class="delete-word-btn text-red-400 hover:text-red-600 text-2xl" data-id="${wordId}" title="Xóa từ này">🗑️</button></div>`;
-                    notebookList.appendChild(card);
-                });
+                querySnapshot.docs
+                    .sort((a,b) => (b.data().addedAt?.seconds || 0) - (a.data().addedAt?.seconds || 0))
+                    .forEach((docSnapshot) => {
+                        const wordData = docSnapshot.data();
+                        const wordId = docSnapshot.id;
+                        const card = document.createElement('div');
+                        card.className = 'bg-teal-50 p-4 rounded-lg border border-teal-200';
+                        card.innerHTML = `<div class="flex justify-between items-start"><div><h4 class="text-xl font-bold text-teal-800 capitalize">${wordData.word}</h4><p class="text-slate-600">${wordData.definition}</p><p class="text-sm text-slate-500 italic mt-2">"${wordData.example}"</p></div><button class="delete-word-btn text-red-400 hover:text-red-600 text-2xl" data-id="${wordId}" data-word="${wordData.word}" title="Xóa từ này">🗑️</button></div>`;
+                        notebookList.appendChild(card);
+                    });
                 document.querySelectorAll('.delete-word-btn').forEach(button => {
                     button.addEventListener('click', (e) => {
                         const wordId = e.currentTarget.dataset.id;
+                        const word = e.currentTarget.dataset.word;
                         showConfirmModal('Bạn có chắc muốn xóa từ này?', async () => {
                             const wordDocRef = doc(db, "users", auth.currentUser.uid, "vocabulary", wordId);
                             await deleteDoc(wordDocRef);
+                            notebookWords.delete(word); // Remove from local cache
                             e.currentTarget.closest('.bg-teal-50').remove();
                         });
                     });
@@ -2513,7 +2587,6 @@
             }
         }
 
-        // Add event listeners with sound
         const addSoundToListener = (element, event, callback) => {
             if (!element) return;
             element.addEventListener(event, (e) => {
@@ -2540,6 +2613,7 @@
         addSoundToListener(closeTranslationModal, 'click', () => hideModal(translationModal));
         addSoundToListener(closeVocabModal, 'click', () => hideModal(vocabModal));
         addSoundToListener(closeReinforceModal, 'click', () => hideModal(reinforceModal));
+        addSoundToListener(closeWordInfoModal, 'click', () => hideModal(wordInfoModal));
         addSoundToListener(backToPreviousViewButton, 'click', () => showView(reviewCameFrom));
         addSoundToListener(backToSetupFromWriting, 'click', () => { currentQuizType === 'path' ? showLearningPath() : showView('setup-view'); });
         addSoundToListener(getFeedbackButton, 'click', getWritingFeedback);
@@ -2590,7 +2664,13 @@
             wordCount.textContent = `${count} từ`;
         });
 
-        // --- Learning Path Event Listeners ---
+        // --- Event Delegation for Word Lookup ---
+        document.getElementById('quiz-view').addEventListener('click', (e) => {
+            if (e.target.classList.contains('lookup-word')) {
+                showWordInfo(e.target.textContent);
+            }
+        });
+
         appContainer.addEventListener('click', (e) => {
             if (e.target && e.target.closest('.start-step-btn')) {
                 playSound('click');
