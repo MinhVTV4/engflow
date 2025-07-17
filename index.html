@@ -396,7 +396,7 @@
             const ai = getAI(app, { backend: new GoogleAIBackend() });
             
             // Using dual model strategy
-            model = getGenerativeModel(ai, { model: "gemini-2.5-flash" }); // Main model
+            model = getGenerativeModel(ai, { model: "gemini-1.5-flash" }); // Main model
             fastModel = getGenerativeModel(ai, { model: "gemini-1.5-flash" }); // Fast model (can be the same for simplicity or a different one)
 
         } catch(e) { 
@@ -688,7 +688,32 @@
         function getVocabularyPrompt(level, topic, count) { return `You are an expert English teacher. Generate ${count} multiple-choice vocabulary questions for an English learner at the ${level} CEFR level. The topic is "${topic}". For the "answer" field, you MUST provide the full text of the correct option. Provide one correct answer, three plausible distractors, and a brief, helpful explanation IN VIETNAMESE. You MUST wrap your entire response in a 'json' markdown code block. The structure MUST be a valid JSON array of objects: \`\`\`json\n[ { "question": "...", "options": ["..."], "answer": "...", "explanation": "..." } ]\n\`\`\``; }
         function getFillInTheBlankPrompt(level, topic, count) { return `You are an expert English teacher. Generate ${count} 'fill-in-the-blank' vocabulary questions for an English learner at the ${level} CEFR level. The topic is "${topic}". For each item, provide a sentence with "___" and the correct "answer" word. Provide a brief, helpful explanation IN VIETNAMESE. You MUST wrap your entire response in a 'json' markdown code block. The structure MUST be a valid JSON array of objects: \`\`\`json\n[ { "type": "fill_in_the_blank", "question": "The government plans to ___ a new high-speed railway.", "answer": "construct", "explanation": "Construct có nghĩa là 'xây dựng'." } ]\n\`\`\``; }
         function getWordFormationPrompt(level, topic, count) { return `You are an expert English teacher. Generate ${count} 'word-formation' questions for an English learner at the ${level} CEFR level. The topic is "${topic}". For each item, provide a sentence with a blank and a base word in parentheses. The "answer" MUST be the single, correctly formed word. Provide a brief, helpful explanation IN VIETNAMESE. You MUST wrap your entire response in a 'json' markdown code block. The structure MUST be a valid JSON array of objects: \`\`\`json\n[ { "type": "word_formation", "question": "Her ___ to the team was a huge benefit. (contribute)", "answer": "contribution", "explanation": "Cần một danh từ ở đây." } ]\n\`\`\``; }
-        function getReadingPrompt(level, topic, count) { return `You are an expert English teacher. Create a reading comprehension quiz. Generate one short reading passage (100-150 words) and ${count} multiple-choice questions. The topic is "${topic}" and for a ${level} CEFR level learner. For each question, provide one correct answer, three plausible distractors, and a brief, helpful explanation IN VIETNAMESE. The "answer" field MUST be the full text of the correct option. You MUST wrap your entire response in a 'json' markdown code block. The structure MUST be a valid JSON object: \`\`\`json\n{ "passage": "...", "questions": [ { "question": "...", "options": ["..."], "answer": "...", "explanation": "..." } ] }\n\`\`\``; }
+        
+        // **FIXED** Reading prompt now enforces English for content and Vietnamese for explanation.
+        function getReadingPrompt(level, topic, count) { 
+            return `You are an expert English teacher. Create a reading comprehension quiz for a ${level} CEFR level learner on the topic of "${topic}".
+            You MUST adhere to the following language rules STRICTLY:
+            - The "passage" MUST be in ENGLISH.
+            - Each object in the "questions" array MUST have a "question" and an "options" array. Both "question" text and all strings within the "options" array MUST be in ENGLISH.
+            - The "answer" field MUST be the full text of the correct option, in ENGLISH.
+            - The "explanation" field is the ONLY field that MUST be in VIETNAMESE.
+
+            Generate one short reading passage (100-150 words) and ${count} multiple-choice questions.
+            You MUST wrap your entire response in a 'json' markdown code block. The structure MUST be a valid JSON object:
+            \`\`\`json
+            { 
+              "passage": "A passage in English about the topic...", 
+              "questions": [ 
+                { 
+                  "question": "An English question about the passage?", 
+                  "options": ["English option 1", "English option 2", "English option 3", "English option 4"], 
+                  "answer": "The correct English option", 
+                  "explanation": "Một lời giải thích bằng tiếng Việt." 
+                } 
+              ] 
+            }
+            \`\`\``; 
+        }
         
         // **FIXED** Grammar prompt now accepts a topic
         function getGrammarPrompt(level, topic, count) { 
@@ -1379,6 +1404,8 @@
             // Reset result view for standard quizzes
             playAgainButton.textContent = "Làm lại";
             playAgainButton.onclick = () => showView('setup-view');
+            reviewAnswersButton.textContent = "Xem lại bài làm";
+            reviewAnswersButton.onclick = () => showReviewPage(sessionResults, quizData.raw, 'result-view');
             reviewAnswersButton.classList.remove('hidden');
             viewHistoryFromResultButton.classList.remove('hidden');
 
